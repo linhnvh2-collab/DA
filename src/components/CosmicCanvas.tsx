@@ -133,7 +133,7 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const bodyBundlesRef = useRef<Map<string, BodyMeshBundle>>(new Map());
-  const cameraTargetPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 75, 120));
+  const cameraTargetPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 140, 200));
   const cameraLookAtRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0));
   const cameraCurrentLookAtRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0));
 
@@ -169,13 +169,21 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
     cosmicAudio.playFlySound();
     if (!targetId) {
       switch (scale) {
-        case 'earth_moon':
-          cameraTargetPosRef.current.set(0, 8, 18);
-          cameraLookAtRef.current.set(0, 0, 0);
+        case 'earth_moon': {
+          const earthBundle = bodyBundlesRef.current.get('earth');
+          if (earthBundle) {
+            const ep = earthBundle.currentPosition;
+            cameraLookAtRef.current.copy(ep);
+            cameraTargetPosRef.current.set(ep.x + 8, ep.y + 4, ep.z + 11);
+          } else {
+            cameraTargetPosRef.current.set(0, 8, 14);
+            cameraLookAtRef.current.set(0, 0, 0);
+          }
           panOffsetRef.current.set(0, 0, 0);
           break;
+        }
         case 'solar_system':
-          cameraTargetPosRef.current.set(0, 75, 120);
+          cameraTargetPosRef.current.set(0, 140, 200);
           cameraLookAtRef.current.set(0, 0, 0);
           panOffsetRef.current.set(0, 0, 0);
           break;
@@ -406,11 +414,11 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
     // 1. Scene
     const scene = new THREE.Scene();
     sceneRef.current = scene;
-    scene.background = new THREE.Color(0x02040a);
+    scene.background = new THREE.Color(0x060c1d);
 
     // 2. Camera
-    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 8000);
-    camera.position.set(0, 75, 120);
+    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 10000);
+    camera.position.set(0, 140, 200);
     cameraRef.current = camera;
     cameraCurrentLookAtRef.current.set(0, 0, 0);
 
@@ -425,22 +433,28 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
     renderer.setPixelRatio(isHeadless ? 1 : Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = 1.2;
     rendererRef.current = renderer;
     container.appendChild(renderer.domElement);
 
-    // 4. Lights
-    const sunLight = new THREE.PointLight(0xfffdf5, 2.5, 600, 0.2);
+    // 4. Multi-Angle Cosmic Lights (Omni-Illumination to prevent dark shadowing)
+    const sunLight = new THREE.PointLight(0xfffdf5, 3.2, 1400, 0.05);
     sunLight.position.set(0, 0, 0);
     scene.add(sunLight);
 
-    const ambientLight = new THREE.AmbientLight(0x222a3d, 0.45);
+    // Camera Headlight: attached to camera so the visible hemisphere of every celestial body is always illuminated!
+    const cameraLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    camera.add(cameraLight);
+    scene.add(camera);
+
+    // Warm/cool cosmic ambient light to reveal full planetary surface textures
+    const ambientLight = new THREE.AmbientLight(0x566d99, 0.95);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0x3a4f78, 0x05070f, 0.35);
+    const hemiLight = new THREE.HemisphereLight(0x7ea7ff, 0x1f2c4a, 0.75);
     scene.add(hemiLight);
 
-    // 5. Starfield Sky Background
+    // 5a. Starfield Sky Background
     const starCount = stateRef.current.graphicsQuality === 'low' ? 4000 : 12000;
     const starGeo = new THREE.BufferGeometry();
     const starPositions = new Float32Array(starCount * 3);
@@ -485,6 +499,44 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
     });
     const starField = new THREE.Points(starGeo, starMat);
     scene.add(starField);
+
+    // 5b. Deep Space Glowing Nebula Clouds (cyan, purple, rose cosmic clouds)
+    const nebulaCount = stateRef.current.graphicsQuality === 'low' ? 800 : 2500;
+    const nebGeo = new THREE.BufferGeometry();
+    const nebPos = new Float32Array(nebulaCount * 3);
+    const nebCols = new Float32Array(nebulaCount * 3);
+    const nebColorsList = [
+      new THREE.Color('#38ada9'),
+      new THREE.Color('#6c5ce7'),
+      new THREE.Color('#e056fd'),
+      new THREE.Color('#00d2d3'),
+      new THREE.Color('#4834d4'),
+    ];
+    for (let i = 0; i < nebulaCount; i++) {
+      const r = 900 + Math.random() * 800;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      nebPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      nebPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.7;
+      nebPos[i * 3 + 2] = r * Math.cos(phi);
+
+      const col = nebColorsList[Math.floor(Math.random() * nebColorsList.length)];
+      nebCols[i * 3] = col.r;
+      nebCols[i * 3 + 1] = col.g;
+      nebCols[i * 3 + 2] = col.b;
+    }
+    nebGeo.setAttribute('position', new THREE.BufferAttribute(nebPos, 3));
+    nebGeo.setAttribute('color', new THREE.BufferAttribute(nebCols, 3));
+    const nebMat = new THREE.PointsMaterial({
+      size: 4.5,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.45,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const nebulaField = new THREE.Points(nebGeo, nebMat);
+    scene.add(nebulaField);
 
     // 6. Deep Space: Milky Way Spiral Galaxy Disk
     const milkyWayGroup = new THREE.Group();
@@ -546,8 +598,84 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
     coreSprite.scale.set(30, 30, 1);
     milkyWayGroup.add(coreSprite);
 
-    milkyWayGroup.position.set(0, -10, 0);
+    milkyWayGroup.position.set(0, 0, 0);
+    milkyWayGroup.visible = false;
     scene.add(milkyWayGroup);
+
+    // 6b. Deep Space: Cosmic Web Structure (for Observable Universe scale)
+    const cosmicWebGroup = new THREE.Group();
+    cosmicWebGroup.name = 'cosmic_web_group';
+    const webNodesCount = 1200;
+    const webNodePositions: THREE.Vector3[] = [];
+    const webGeo = new THREE.BufferGeometry();
+    const webPos = new Float32Array(webNodesCount * 3);
+    const webCols = new Float32Array(webNodesCount * 3);
+
+    const webColors = [
+      new THREE.Color('#0abde3'),
+      new THREE.Color('#9c88ff'),
+      new THREE.Color('#ff9ff3'),
+      new THREE.Color('#48dbfb'),
+      new THREE.Color('#5f27cd'),
+    ];
+
+    for (let i = 0; i < webNodesCount; i++) {
+      const rad = 60 + Math.pow(Math.random(), 0.7) * 200;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      const px = rad * Math.sin(phi) * Math.cos(theta);
+      const py = rad * Math.sin(phi) * Math.sin(theta) * 0.7;
+      const pz = rad * Math.cos(phi);
+      webNodePositions.push(new THREE.Vector3(px, py, pz));
+
+      webPos[i * 3] = px;
+      webPos[i * 3 + 1] = py;
+      webPos[i * 3 + 2] = pz;
+
+      const col = webColors[i % webColors.length];
+      webCols[i * 3] = col.r;
+      webCols[i * 3 + 1] = col.g;
+      webCols[i * 3 + 2] = col.b;
+    }
+
+    webGeo.setAttribute('position', new THREE.BufferAttribute(webPos, 3));
+    webGeo.setAttribute('color', new THREE.BufferAttribute(webCols, 3));
+    const webMat = new THREE.PointsMaterial({
+      size: 3.5,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const webPoints = new THREE.Points(webGeo, webMat);
+    cosmicWebGroup.add(webPoints);
+
+    // Filament lines linking nearby galaxy clusters
+    const filamentPts: THREE.Vector3[] = [];
+    for (let i = 0; i < webNodesCount; i += 3) {
+      const pA = webNodePositions[i];
+      for (let j = i + 1; j < Math.min(i + 12, webNodesCount); j++) {
+        const pB = webNodePositions[j];
+        if (pA.distanceTo(pB) < 42) {
+          filamentPts.push(pA, pB);
+        }
+      }
+    }
+    if (filamentPts.length > 0) {
+      const filGeo = new THREE.BufferGeometry().setFromPoints(filamentPts);
+      const filMat = new THREE.LineBasicMaterial({
+        color: 0x48dbfb,
+        transparent: true,
+        opacity: 0.25,
+        blending: THREE.AdditiveBlending,
+      });
+      const filLines = new THREE.LineSegments(filGeo, filMat);
+      cosmicWebGroup.add(filLines);
+    }
+
+    cosmicWebGroup.visible = false;
+    scene.add(cosmicWebGroup);
 
     // 7. Asteroid Belt
     const asteroidGroup = new THREE.Group();
@@ -650,8 +778,99 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
 
     // 13. Build Celestial Bodies Meshes & Orbits
     bodyBundlesRef.current.clear();
-
     CELESTIAL_BODIES.forEach((body) => {
+      // 1. Macro Cosmic Structures: Milky Way & Observable Universe are represented by dedicated particle & cosmic web groups, NOT solid spheres!
+      if (body.id === 'milky_way' || body.id === 'observable_universe') {
+        const meshGroup = new THREE.Group();
+        meshGroup.name = `body_${body.id}`;
+        scene.add(meshGroup);
+
+        bodyBundlesRef.current.set(body.id, {
+          body,
+          meshGroup,
+          currentAngle: 0,
+          currentPosition: new THREE.Vector3(0, 0, 0),
+          velocity: new THREE.Vector3(),
+          isDragged: false,
+          isDestroyed: false,
+          initialRadius: 0,
+        });
+        return;
+      }
+
+      // 2. Andromeda Galaxy: rendered as a majestic spiral particle galaxy disc
+      if (body.id === 'andromeda_galaxy') {
+        const meshGroup = new THREE.Group();
+        meshGroup.name = `body_${body.id}`;
+
+        const andrGeo = new THREE.BufferGeometry();
+        const andrCount = 3500;
+        const andrPos = new Float32Array(andrCount * 3);
+        const andrCols = new Float32Array(andrCount * 3);
+        const arms = 2;
+        for (let i = 0; i < andrCount; i++) {
+          const arm = i % arms;
+          const dist = Math.pow(Math.random(), 1.8) * 32 + 1;
+          const ang = arm * Math.PI + (dist / 32) * 3.8 + (Math.random() - 0.5) * 0.35;
+          const sx = Math.cos(ang) * dist + (Math.random() - 0.5) * (dist * 0.2);
+          const sz = Math.sin(ang) * dist + (Math.random() - 0.5) * (dist * 0.2);
+          const sy = (Math.random() - 0.5) * (5 * Math.exp(-dist / 15));
+          andrPos[i * 3] = sx;
+          andrPos[i * 3 + 1] = sy;
+          andrPos[i * 3 + 2] = sz;
+
+          const col = new THREE.Color().lerpColors(new THREE.Color('#48dbfb'), new THREE.Color('#ffeaa7'), Math.max(0, 1 - dist / 12));
+          andrCols[i * 3] = col.r;
+          andrCols[i * 3 + 1] = col.g;
+          andrCols[i * 3 + 2] = col.b;
+        }
+        andrGeo.setAttribute('position', new THREE.BufferAttribute(andrPos, 3));
+        andrGeo.setAttribute('color', new THREE.BufferAttribute(andrCols, 3));
+        const andrMat = new THREE.PointsMaterial({
+          size: 1.5,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.85,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const andrPoints = new THREE.Points(andrGeo, andrMat);
+        meshGroup.add(andrPoints);
+
+        const andrCoreTex = getProceduralTexture('galaxy_core', renderer);
+        const andrCoreMat = new THREE.SpriteMaterial({
+          map: andrCoreTex,
+          color: 0xffeaa7,
+          transparent: true,
+          opacity: 0.95,
+          blending: THREE.AdditiveBlending,
+        });
+        const andrCore = new THREE.Sprite(andrCoreMat);
+        andrCore.scale.set(16, 16, 1);
+        meshGroup.add(andrCore);
+
+        meshGroup.rotation.x = THREE.MathUtils.degToRad(35);
+        meshGroup.rotation.z = THREE.MathUtils.degToRad(25);
+        meshGroup.userData = { bodyId: body.id, isCelestialTarget: true };
+
+        const initialAngle = 0;
+        const initialPos = new THREE.Vector3(120, 20, 0);
+        meshGroup.position.copy(initialPos);
+        scene.add(meshGroup);
+
+        bodyBundlesRef.current.set(body.id, {
+          body,
+          meshGroup,
+          currentAngle: initialAngle,
+          currentPosition: initialPos,
+          velocity: new THREE.Vector3(),
+          isDragged: false,
+          isDestroyed: false,
+          initialRadius: 35,
+        });
+        return;
+      }
+
       const meshGroup = new THREE.Group();
       meshGroup.name = `body_${body.id}`;
 
@@ -731,6 +950,23 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
         meshGroup.add(ringsMesh);
       }
 
+      // Luminous Beacon Halo: ensures every planet is clearly visible from afar without being lost in darkness
+      if (body.type === 'planet' || body.type === 'dwarf_planet' || body.id === 'moon') {
+        const beaconGeo = new THREE.RingGeometry(rad * 1.25, rad * 1.45, 32);
+        const beaconMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(body.glowColorHex || body.colorHex),
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.5,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const beaconMesh = new THREE.Mesh(beaconGeo, beaconMat);
+        beaconMesh.rotation.x = Math.PI / 2;
+        beaconMesh.name = `beacon_${body.id}`;
+        meshGroup.add(beaconMesh);
+      }
+
       // Orbit Line Path
       let orbitLine: THREE.Line | undefined;
       let orbitPts: THREE.Vector3[] | undefined;
@@ -749,7 +985,7 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
         const orbitMat = new THREE.LineBasicMaterial({
           color: new THREE.Color(body.colorHex),
           transparent: true,
-          opacity: 0.28,
+          opacity: 0.55,
         });
         orbitLine = new THREE.Line(orbitGeo, orbitMat);
         scene.add(orbitLine);
@@ -843,7 +1079,11 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
 
       // Check Raycast against Celestial Bodies for Direct Grab & Drag
       const intersects = _raycaster.intersectObjects(scene.children, true);
-      const hit = intersects.find((i) => i.object.userData?.isCelestialTarget);
+      const hit = intersects.find((i) => {
+        if (!i.object.userData?.isCelestialTarget) return false;
+        const b = bodyBundlesRef.current.get(i.object.userData.bodyId);
+        return b && b.meshGroup.visible && !b.isDestroyed;
+      });
 
       if (hit && !isRight) {
         const bodyId = hit.object.userData.bodyId;
@@ -926,7 +1166,11 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
       // 3. Hover indication when idle
       if (!isDraggingCameraRef.current) {
         const intersects = _raycaster.intersectObjects(scene.children, true);
-        const hit = intersects.find((i) => i.object.userData?.isCelestialTarget);
+        const hit = intersects.find((i) => {
+          if (!i.object.userData?.isCelestialTarget) return false;
+          const b = bodyBundlesRef.current.get(i.object.userData.bodyId);
+          return b && b.meshGroup.visible && !b.isDestroyed;
+        });
         if (hit) {
           container.style.cursor = 'grab';
         } else {
@@ -1034,7 +1278,11 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
 
       _raycaster.setFromCamera(_mouse, camera);
       const intersects = _raycaster.intersectObjects(scene.children, true);
-      const hit = intersects.find((i) => i.object.userData?.isCelestialTarget);
+      const hit = intersects.find((i) => {
+        if (!i.object.userData?.isCelestialTarget) return false;
+        const b = bodyBundlesRef.current.get(i.object.userData.bodyId);
+        return b && b.meshGroup.visible && !b.isDestroyed;
+      });
 
       if (hit) {
         const bodyId = hit.object.userData.bodyId;
@@ -1068,10 +1316,49 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
       const state = stateRef.current;
       const speedMult = state.simSpeed;
 
-      // 17a. Rotate & Orbit Celestial Bodies
+      // 17a. Rotate & Orbit Celestial Bodies with Scale-Based Visibility
       bodyBundlesRef.current.forEach((bundle) => {
-        if (bundle.isDestroyed) return;
+        if (bundle.isDestroyed) {
+          bundle.meshGroup.visible = false;
+          if (bundle.orbitLine) bundle.orbitLine.visible = false;
+          return;
+        }
         const b = bundle.body;
+
+        // Determine whether this celestial body belongs in the current scale level
+        let isVisible = false;
+        switch (state.currentScale) {
+          case 'earth_moon':
+            isVisible = b.id === 'earth' || b.id === 'moon' || b.id === 'sun';
+            break;
+          case 'solar_system':
+            // Sun and all Solar System bodies (planets, dwarf planets, moons, comets, asteroids)
+            isVisible = b.scaleLevel === 'solar_system' || b.scaleLevel === 'earth_moon';
+            break;
+          case 'stellar_neighborhood':
+            isVisible = b.scaleLevel === 'stellar_neighborhood' || b.id === 'sun';
+            break;
+          case 'milky_way':
+            isVisible = b.scaleLevel === 'milky_way' || b.id === 'sun';
+            break;
+          case 'local_group':
+            isVisible = b.scaleLevel === 'local_group' || b.scaleLevel === 'milky_way';
+            break;
+          case 'observable_universe':
+            isVisible = b.scaleLevel === 'observable_universe';
+            break;
+        }
+
+        // Always show the specifically selected body
+        if (state.selectedBody && state.selectedBody.id === b.id) {
+          isVisible = true;
+        }
+
+        bundle.meshGroup.visible = isVisible;
+        if (!isVisible) {
+          if (bundle.orbitLine) bundle.orbitLine.visible = false;
+          return;
+        }
 
         if (bundle.surfaceMesh) {
           bundle.surfaceMesh.rotation.y += b.rotationSpeed * speedMult * 0.4;
@@ -1108,7 +1395,7 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
         }
 
         if (bundle.orbitLine) {
-          bundle.orbitLine.visible = state.showOrbits && !bundle.isDestroyed && (state.currentScale === 'solar_system' || state.currentScale === 'earth_moon');
+          bundle.orbitLine.visible = state.showOrbits && bundle.meshGroup.visible && !bundle.isDestroyed && bundle.body.orbitRadiusVisual > 0;
         }
 
         if (bundle.surfaceMesh) {
@@ -1270,9 +1557,12 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
         explosionsRef.current = explosionsRef.current.filter((p) => p.life < p.maxLife);
       }
 
-      // 17f. Milky Way & Asteroid Belt rotation
+      // 17f. Deep Space & Asteroid Belt rotation
       milkyWayGroup.rotation.y += 0.0004 * (speedMult > 0 ? 1 : 0.2);
-      milkyWayGroup.visible = state.currentScale === 'milky_way' || state.currentScale === 'local_group' || state.currentScale === 'observable_universe';
+      milkyWayGroup.visible = state.currentScale === 'milky_way' || state.currentScale === 'local_group';
+
+      cosmicWebGroup.rotation.y += 0.0002;
+      cosmicWebGroup.visible = state.currentScale === 'observable_universe';
 
       asteroidGroup.rotation.y += 0.001 * speedMult;
       asteroidGroup.visible = state.showAsteroidBelt && state.currentScale === 'solar_system';
@@ -1308,24 +1598,24 @@ export const CosmicCanvas: React.FC<CosmicCanvasProps> = ({
       if (state.showLabels && container) {
         const labels: Array<{ id: string; name: string; x: number; y: number; visible: boolean; isSelected: boolean }> = [];
         bodyBundlesRef.current.forEach((bundle) => {
-          if (bundle.isDestroyed) return;
-          if (bundle.body.scaleLevel === state.currentScale || (state.currentScale === 'solar_system' && bundle.body.type === 'planet')) {
-            _vec3A.copy(bundle.currentPosition);
-            _vec3A.project(camera);
+          if (bundle.isDestroyed || !bundle.meshGroup.visible) return;
+          if (bundle.body.id === 'milky_way' || bundle.body.id === 'observable_universe') return;
 
-            const isBehind = _vec3A.z > 1;
-            const screenX = (_vec3A.x * 0.5 + 0.5) * container.clientWidth;
-            const screenY = (-(_vec3A.y * 0.5) + 0.5) * container.clientHeight;
+          _vec3A.copy(bundle.currentPosition);
+          _vec3A.project(camera);
 
-            labels.push({
-              id: bundle.body.id,
-              name: bundle.body.nameVi,
-              x: screenX,
-              y: screenY,
-              visible: !isBehind && screenX > 20 && screenX < container.clientWidth - 20 && screenY > 20 && screenY < container.clientHeight - 20,
-              isSelected: state.selectedBody?.id === bundle.body.id,
-            });
-          }
+          const isBehind = _vec3A.z > 1;
+          const screenX = (_vec3A.x * 0.5 + 0.5) * container.clientWidth;
+          const screenY = (-(_vec3A.y * 0.5) + 0.5) * container.clientHeight;
+
+          labels.push({
+            id: bundle.body.id,
+            name: bundle.body.nameVi,
+            x: screenX,
+            y: screenY,
+            visible: !isBehind && screenX > 20 && screenX < container.clientWidth - 20 && screenY > 20 && screenY < container.clientHeight - 20,
+            isSelected: state.selectedBody?.id === bundle.body.id,
+          });
         });
         setScreenLabels(labels);
       } else {

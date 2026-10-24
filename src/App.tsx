@@ -72,15 +72,8 @@ export default function App() {
 
   const handleSelectScale = (scale: CosmicScaleLevel) => {
     setCurrentScale(scale);
-    let representative: CelestialBody | undefined;
-    if (scale === 'earth_moon') representative = CELESTIAL_BODIES.find((b) => b.id === 'earth');
-    else if (scale === 'solar_system') representative = CELESTIAL_BODIES.find((b) => b.id === 'sun');
-    else if (scale === 'stellar_neighborhood') representative = CELESTIAL_BODIES.find((b) => b.id === 'proxima_centauri');
-    else if (scale === 'milky_way') representative = CELESTIAL_BODIES.find((b) => b.id === 'milky_way');
-    else if (scale === 'local_group') representative = CELESTIAL_BODIES.find((b) => b.id === 'andromeda_galaxy');
-    else if (scale === 'observable_universe') representative = CELESTIAL_BODIES.find((b) => b.id === 'observable_universe');
-
-    setSelectedBody(representative || null);
+    // Keep camera in wide panoramic overview without any dark obstruction panels!
+    setSelectedBody(null);
   };
 
   const handleSelectBody = (body: CelestialBody | null) => {

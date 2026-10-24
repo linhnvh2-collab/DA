@@ -165,6 +165,19 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
             <span className="hidden sm:inline">Học tập</span>
           </button>
 
+          {/* Panoramic Solar System Overview Button */}
+          <button
+            onClick={() => {
+              onSelectScale('solar_system');
+              onResetView();
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900/90 border border-cyan-400/50 text-cyan-200 text-xs font-mono transition-all shadow-md cursor-pointer"
+            title="Quan sát toàn thể các hành tinh mà không bị che khuất"
+          >
+            <Orbit className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden md:inline">Toàn cảnh Các Hành Tinh</span>
+          </button>
+
           {/* Reset Camera View */}
           <button
             onClick={onResetView}

@@ -35,6 +35,7 @@ export const CelestialInfoPanel: React.FC<CelestialInfoPanelProps> = ({
   onSelectInteractionMode,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'internal' | 'moons' | 'compare' | 'facts'>('overview');
+  const [isMinimized, setIsMinimized] = useState(false);
 
   if (!body) return null;
 
@@ -42,6 +43,30 @@ export const CelestialInfoPanel: React.FC<CelestialInfoPanelProps> = ({
   const earthGravity = 9.807;
   const diamRatio = (body.diameterKm / earthDiameter).toFixed(2);
   const gravRatio = (body.gravityMPerS2 / earthGravity).toFixed(2);
+
+  // If minimized, render a sleek small floating pill that never obscures the 3D celestial view!
+  if (isMinimized) {
+    return (
+      <div className="fixed top-20 right-4 z-30 pointer-events-auto flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-950/90 border border-cyan-400/60 shadow-2xl backdrop-blur-md animate-in fade-in">
+        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: body.colorHex }} />
+        <span className="font-bold text-xs text-white">{body.nameVi}</span>
+        <button
+          onClick={() => setIsMinimized(false)}
+          className="px-2 py-0.5 rounded-lg bg-cyan-950/90 border border-cyan-500/40 text-[10px] text-cyan-300 hover:text-white font-mono cursor-pointer transition-colors"
+          title="Mở rộng bảng chi tiết"
+        >
+          Chi tiết ▴
+        </button>
+        <button
+          onClick={onClose}
+          className="text-slate-400 hover:text-white text-xs p-1 cursor-pointer transition-colors"
+          title="Đóng"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
 
   return (
     <aside className="fixed top-18 right-3 bottom-24 z-30 w-full max-w-sm sm:max-w-md pointer-events-auto flex flex-col bg-slate-950/95 border border-cyan-500/40 rounded-2xl shadow-2xl shadow-cyan-950/40 backdrop-blur-md overflow-hidden transition-all duration-300">
@@ -73,13 +98,22 @@ export const CelestialInfoPanel: React.FC<CelestialInfoPanelProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-            title="Đóng bảng thông tin"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setIsMinimized(true)}
+              className="px-2 py-1 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 text-xs font-mono transition-colors cursor-pointer"
+              title="Thu nhỏ để không che màn hình 3D"
+            >
+              Thu nhỏ —
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Đóng bảng thông tin"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
 
